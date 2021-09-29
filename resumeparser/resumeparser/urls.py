@@ -18,6 +18,6 @@ from django.conf.urls import include
 from django.urls import path
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    # path('admin/', admin.site.urls),
     path('api/parser/', include('RP_RestAPI.urls')),
 ]

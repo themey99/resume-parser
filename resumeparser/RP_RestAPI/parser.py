@@ -9,7 +9,7 @@ from pdfminer.cmapdb import CMapDB
 from pdfminer.layout import LAParams
 from pdfminer.image import ImageWriter
 import io
-
+import re
 
 def parse(resume):
     imagewriter = None
@@ -38,14 +38,28 @@ def parse(resume):
         interpreter.process_page(page)
         data = retstr.getvalue()
 
-    weird = ["\xa0", "\uf0da", "\x0c", "• ", "* ", "(LinkedIn)", " (LinkedIn)", "\uf0a7", "(Mobile)", "-       ", "●", "Page 1 of 4", "Page 2 of 4", "Page 3 of 4", "Page 4 of 4"]
+    data = re.sub(r'Page \d of \d', 'Page /d of /d', data)
+    weird = ["\xa0", "\uf0da", "\x0c", "• ", "* ", "(LinkedIn)", " (LinkedIn)", "\uf0a7", "(Mobile)", "-       ", "●", "Page /d of /d"]
     for i in weird:
         data = data.replace(i, "")
 
     result_list = data.split('\n')
     lengthOfResultArray = result_list.__len__()
+
+    # Section to validate
+    sections = [
+        "Contact",
+        "Contactar" ,
+        "Top Skills",
+        "Aptitudes principales",
+        "Certifications",
+        "Summary",
+        "Languages",
+        "Education"
+    ]
+
     for i in result_list:
-        if i == 'Contact':
+        if i == 'Contact' or i == 'Contactar':
             value = result_list.index(i)
             while True:
                 value = value + 1
@@ -67,7 +81,7 @@ def parse(resume):
                 ln.append(merged)
                 linkedin = ln
 
-        if i == 'Top Skills':
+        if i == 'Top Skills' or i == 'Aptitudes principales':
             value = result_list.index(i)
             while True:
                 value = value + 1
@@ -76,7 +90,7 @@ def parse(resume):
                     skills.remove(result_list[value])
                     break
 
-        if i.__contains__('Certifications'):
+        if i.__contains__('Certifications') or i.__contains__('Certificationes'):
             value = result_list.index(i)
             while True:
                 value = value + 1
@@ -85,7 +99,7 @@ def parse(resume):
                     certifications.remove(result_list[value])
                     break
 
-        if i.__contains__('Summary'):
+        if i.__contains__('Summary') or i.__contains__('Extracto'):
             value = result_list.index(i)
             while True:
                 value = value + 1
@@ -94,7 +108,7 @@ def parse(resume):
                     summary.remove(result_list[value])
                     break
 
-        if i == 'Languages':
+        if i == 'Languages' or i == 'Idiomas':
             value = result_list.index(i)
             while True:
                 value = value + 1
@@ -103,7 +117,7 @@ def parse(resume):
                     languages.remove(result_list[value])
                     break
 
-        if i == 'Experience':
+        if i == 'Experience' or i == 'Experiencia':
             value = result_list.index(i)
             value = value + 2
 
@@ -112,9 +126,7 @@ def parse(resume):
                 if (value >= lengthOfResultArray - 1):
                     break
                 # Following condition checks if we have encountered another section that means this section has finished
-                if (str(result_list[value]) == "Contact" or str(result_list[value]) == "Top Skills" or str(
-                        result_list[value]) == "Certifications" or str(result_list[value]) == "Summary" or str(
-                        result_list[value]) == "Languages" or str(result_list[value]) == "Education"):
+                if (str(result_list[value]) in sections):
                     break
                 if (result_list[value] == ''):
                     value += 1
@@ -138,7 +150,7 @@ def parse(resume):
                 else:
                     value += 1
 
-        if i == 'Education':
+        if i == 'Education' or i == 'Educación':
             value = result_list.index(i)
             value = value + 1
             index = 0;
@@ -147,17 +159,17 @@ def parse(resume):
                 if (value >= lengthOfResultArray - 1):
                     break
                 #Following condition checks if we have encountered another section that means this section has finished
-                if (str(result_list[value]) == "Contact" or str(result_list[value]) == "Top Skills" or str(
-                    result_list[value]) == "Certifications" or str(result_list[value]) == "Summary" or str(
-                    result_list[value]) == "Languages" or str(result_list[value]) == "Experience"):
+                if (str(result_list[value]) in sections):
                         break
                 if result_list[value] == '':
                     value = value + 1
-                else:
-                    education.append(result_list[value])
-                    value = value + 1
-                    index += 1
-                    if (index == 2):
+
+                    #Reorder if institution's name has more than two line
+                    if (index == 3):
+                        education[0] += ' ' + education[1]
+                        education[1] = education.pop()
+
+                    if(index > 0):
                         #When we have fetched the 2 values(school & degree) in the education array, we can now create an education object from this array
                         listOfEdu = ["school", "degree"]
                         zipbObj = zip(listOfEdu, education)
@@ -166,6 +178,10 @@ def parse(resume):
                         complete_education.append(edu_dict)
                         index = 0
                         education = []
+                else:
+                    education.append(result_list[value])
+                    value = value + 1
+                    index += 1
 
     alld['contact'] = contact
     alld['skills'] = skills
